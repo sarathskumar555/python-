@@ -1,86 +1,210 @@
-from db import db
+from flask_restful import Resource, reqparse
+from flask_jwt import jwt_required
+from models.survey import surveyModel
 from datetime import datetime
+from flask import request,jsonify
+from flask_jwt_extended import jwt_required
+from models.surveyquestion import surveyquestionModel
+
+
+class survey(Resource):
+
+# GETTING THE DETAILS BY ID
+    @jwt_required
+    def get(self, id):
+        survey = surveyModel.find_by_id(id)
+
+        if survey and survey.Status==True:
+            str1 =str(survey.start_Date)
+            str2 =str(survey.end_Date)
+            data ={
+            "id":survey.id,
+            "name":survey.name,
+            "description":survey.description,
+            "thank_you_message":survey.thank_you_message,
+            "end_Date":str2,
+            "start_Date":str1}
+            return (data)
+
+
+        else:
+             return {'message': 'survey not found'}, 404
 
 
 
-class surveyModel(db.Model):
-    __tablename__ = 'survey'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80))
-    description = db.Column(db.String(80))
-    Status = db.Column(db.Boolean, default=True)
-    thank_you_message = db.Column(db.String(80))
-    start_Date =db.Column(db.DateTime(80))
-    surveyquestion = db.relationship('surveyquestionModel', backref='survey', lazy=True)
-    user = db.relationship('surveyresponseModel', backref='survey', lazy=True)
-    end_Date = db.Column(db.DateTime(80))
 
 
 
+# DELETING THE DETAILS BY ID
+
+    @jwt_required
+    def delete(self, id):
+        survey = surveyModel.find_by_id(id)
+        if survey and survey.Status==True:
+            sur_que=surveyquestionModel.query.all()
+            # print(sur_que)
+            for x in sur_que:
+                if x.survey_id==id:
+                    x.Status=False
+
+
+
+            deleted = surveyModel.update_by_status(id)
+
+            str1 =str(survey.start_Date)
+            str2 =str(survey.end_Date)
+            data ={
+            "message":"record deleted",
+            "id":survey.id
+            }
+
+            return(data)
+        else:
+            return {'message': 'survey not found.'}, 404
 
 
 
 
 
-    def __init__(self, name,description,thank_you_message,start_Date,end_Date):
-        self.name = name
-        self.description = description
-        self.thank_you_message = thank_you_message
-        self.start_Date = start_Date
-        self.end_Date = end_Date
-        print(type(self.start_Date))
+
+
+
+# UPDATING THE DETAILS BY ID
+    @jwt_required
+    def put(self,id):
+        data =request.get_json()
+
+        Survey = surveyModel.find_by_id(id)
+        # print('ssssssssss',type(data['end_Date']))
+
+ # datetime.strptime(ss, '%Y-%m-%d %H:%M:%S.%f')
+        if Survey and Survey.Status==True:
+            start = datetime.strptime(data['start_Date'], '%Y-%m-%d %H:%M:%S.%f')
+            end = datetime.strptime(data['end_Date'], '%Y-%m-%d %H:%M:%S.%f')
+            Survey.name = data['name']
+            Survey.description = data['description']
+            Survey.thank_you_message = data['thank_you_message']
+            Survey.start_Date =start
+            Survey.end_Date = end
+            Survey.save_to_db()
+            str1 =str(Survey.start_Date)
+            str2 =str(Survey.end_Date)
+            data ={
+            "message":"survey updated",
+            "id":Survey.id
+            }
+
+            return(data)
+
+        else:
+            return{"message":"no record found"}
 
 
 
 
-    def json(self):
-        return {'name': self.name,'description': self.description,'thank_you_message': self.thank_you_message,'start_Date': self.start_Date,'end_Date':self.end_Date,'id':self.id,'Status':self.Status}
-
-    @classmethod
-    def find_by_id(cls,id):
-        # print("sssssssssssss",cls.query.filter_by(id=id).first())
-        return cls.query.filter_by(id=id).first()
-    @classmethod
-    def find5_by_id(cls):
-        return cls.query.all()
 
 
 
-    #
-    @classmethod
-    def finds_by_id(cls,id):
-        data= cls.query.filter_by(id=id).first()
+# GETTING THE FULL LIST OF THE DATA
+class surveyList(Resource):
+    @jwt_required
+    def get(self):
+        data1=[]
+        date=datetime.now()
+        surveys = surveyModel.query.filter(surveyModel.end_Date >= date,  surveyModel.Status == True)
+        # print('sss',survey)
 
-        # print(data)
-        # str1=str(data.start_Date)
-        # str2=str(data.end_Date)
-        data1={
-        "id":data.id,
-        "name":data.name,
+        for x in surveys:
 
-        # "start_Date":str1,
-        # "end_Date":str2,
+              data={
+                    "id":x.id,
+                    "name":x.name,
+                    "description":x.description,
+                    "thankYouMessage":x.thank_you_message,
+                    "start_Date":str(x.start_Date),
+                    "end_Date":str(x.end_Date)
+                    }
+              data1.append(data)
 
+        print(data1)
+        # s=data1 is None
+        if data1 ==[]:
+            print("sarath")
+            return("no active survey")
+        else:
+            print("johan")
+            return(data1)
+
+
+
+
+
+
+
+
+
+        # for x in surveyModel:
+        #     print(x)
+        #
+
+
+
+
+
+
+# str1=str(x.start_Date)
+# str2 =str(x.end_Date)
+# data ={
+# "id":x.id,
+# "name":x.name,
+# "description":x.description,
+# "thank_you_message":x.thank_you_message,
+# "end_Date":str2,
+# "start_Date":str1}
+# survey.append(data)
+# return(survey)
+
+
+
+
+
+
+
+
+
+
+
+# POSTING THE DETAILS
+
+class surveyData(Resource):
+
+    @jwt_required
+    def post(self):
+        data = request.get_json()
+
+
+
+        start = datetime.strptime(data['start_Date'], '%Y-%m-%d %H:%M:%S.%f')
+        end = datetime.strptime(data['end_Date'], '%Y-%m-%d %H:%M:%S.%f')
+        # print(type(start_Date))
+        Survey = surveyModel(data['name'],data['description'],data['thank_you_message'],start,end)
+
+
+
+
+        try:
+            # print(Survey.end_Date)
+            Survey.save_to_db()
+
+        except:
+
+            return {"message": "An error occurred inserting the item."}, 500
+
+        str1=str(start)
+        str2=str(end)
+        data ={
+        "message":"survey created",
+        "id":Survey.id
         }
-        return(data1)
 
-
-
-
-    @classmethod
-    def update_by_status(cls, id):
-         data = cls.query.filter_by(id=id).first()
-         data.Status=False
-         db.session.commit()
-
-
-
-    def save_to_db(self):
-
-        db.session.add(self)
-        db.session.commit()
-
-    def delete_from_db(self):
-        db.session.delete(self)
-        db.session.commit()
+        return(data)
